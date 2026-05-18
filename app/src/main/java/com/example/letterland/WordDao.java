@@ -2,40 +2,31 @@ package com.example.letterland;
 
 import androidx.room.Dao;
 import androidx.room.Insert;
-import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+
 import java.util.List;
-import androidx.room.Update;
-import androidx.room.Delete;
 
 @Dao
 public interface WordDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insert(WordEntry word);
 
-    // ONLY grab the picture if it belongs to this specific kid
-    @Query("SELECT * FROM word_table WHERE word = :searchWord AND profileName = :playerName LIMIT 1")
-    WordEntry findWordForProfile(String searchWord, String playerName);
+    @Insert
+    void insert(WordEntry wordEntry);
 
-    // ONLY grab the gallery pictures for the kid who is logged in (NEWEST AT THE TOP)
-    @Query("SELECT * FROM word_table WHERE profileName = :playerName ORDER BY rowid DESC")
+    @Query("SELECT * FROM words WHERE player = :playerName")
     List<WordEntry> getAllWordsForProfile(String playerName);
 
-    // 🚀 NEW: ONLY grab the starred pictures for the Quiz!
-    @Query("SELECT * FROM word_table WHERE profileName = :playerName AND isStarred = 1 ORDER BY rowid DESC")
+    @Query("SELECT * FROM words WHERE word = :wordText AND player = :playerName LIMIT 1")
+    WordEntry findWordForProfile(String wordText, String playerName);
+
+    @Query("SELECT * FROM words WHERE isStarred = 1 AND player = :playerName")
     List<WordEntry> getStarredWordsForProfile(String playerName);
 
-    // Grab absolutely everything in the database! (NEWEST AT THE TOP)
-    @Query("SELECT * FROM word_table ORDER BY rowid DESC")
-    List<WordEntry> getAllWords();
+    @Query("UPDATE words SET isStarred = :isStarred WHERE word = :wordText AND player = :playerName")
+    void updateStarStatus(String wordText, String playerName, boolean isStarred);
 
-    // Transfer ownership of all pictures to the new name!
-    @Query("UPDATE word_table SET profileName = :newName WHERE profileName = :oldName")
-    void updateProfileName(String oldName, String newName);
+    @Query("DELETE FROM words WHERE word = :wordText AND player = :playerName")
+    void deleteWord(String wordText, String playerName);
 
-    @Update
-    void update(WordEntry word);
-
-    @Delete
-    void delete(WordEntry word);
+    @Query("UPDATE words SET player = :newName WHERE player = :oldName")
+    void updatePlayerName(String oldName, String newName);
 }

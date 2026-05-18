@@ -1,64 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
+    android:layout_marginHorizontal="16dp"
     android:layout_marginVertical="8dp"
-    app:cardBackgroundColor="#21212B"
+    app:cardBackgroundColor="#FFFFFF"
     app:cardCornerRadius="16dp"
-    app:cardElevation="4dp"
-    app:strokeColor="#29B6F6"
-    app:strokeWidth="3dp">
+    app:cardElevation="2dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="12dp">
 
-        <ImageView
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/ivAvatar"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:scaleType="centerCrop"
-            android:src="@drawable/admin_pic"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:strokeColor="#DDDDDD"
+            app:strokeWidth="2dp" />
 
         <TextView
             android:id="@+id/tvProfileName"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
-            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
             android:fontFamily="@font/kid_font"
-            android:includeFontPadding="false"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            app:autoSizeMaxTextSize="22sp"
-            app:autoSizeMinTextSize="14sp"
-            app:autoSizeTextType="uniform"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toEndOf="@id/ivAvatar"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="Player Name" />
+            android:textColor="#333333"
+            android:textSize="24sp" />
 
+        <ImageButton
+            android:id="@+id/btnEditProfile"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Edit Name"
+            android:src="@android:drawable/ic_menu_edit"
+            app:tint="#FF9800" />
 
         <ImageButton
             android:id="@+id/btnDeleteProfile"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:padding="10dp"
-            android:scaleType="centerInside"
+            android:contentDescription="Delete Profile"
             android:src="@android:drawable/ic_menu_delete"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
             app:tint="#F44336" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

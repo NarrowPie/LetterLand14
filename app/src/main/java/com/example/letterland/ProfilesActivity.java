@@ -103,11 +103,9 @@ public class ProfilesActivity extends AppCompatActivity {
 
         try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
-
             prefs.edit().putString("AVATAR_" + profileName, file.getAbsolutePath()).apply();
 
-            // 🌟 LOG: PROFILE EDITED (Image changed)
-            recordPlayerLog(profileName, "Changed avatar image");
+            recordPlayerLog(profileName, "EDITED");
 
             runOnUiThread(() -> {
                 Toast.makeText(this, "Profile picture updated!", Toast.LENGTH_SHORT).show();
@@ -130,14 +128,17 @@ public class ProfilesActivity extends AppCompatActivity {
 
                     if (!newName.isEmpty()) {
                         Set<String> oldProfiles = prefs.getStringSet("ALL_PROFILES", new HashSet<>());
+
+                        if (oldProfiles.contains(newName)) {
+                            Toast.makeText(this, "That profile already exists!", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
                         Set<String> newProfiles = new HashSet<>(oldProfiles);
                         newProfiles.add(newName);
-
                         prefs.edit().putStringSet("ALL_PROFILES", newProfiles).apply();
 
-                        // 🌟 LOG: NEW PROFILE ADDED
-                        recordPlayerLog(newName, "Added new profile");
-
+                        recordPlayerLog(newName, "ADDED");
                         loadProfiles();
                     }
                 })
@@ -145,19 +146,65 @@ public class ProfilesActivity extends AppCompatActivity {
                 .show();
     }
 
-    // 🌟 THE MAGIC METHOD THAT SAVES LOGS TO THE DATABASE!
-    private void recordPlayerLog(String playerName, String action) {
+    private void showEditProfileDialog(String oldName) {
+        EditText input = new EditText(this);
+        input.setText(oldName);
+        input.setSelection(oldName.length());
+
+        new AlertDialog.Builder(this)
+                .setTitle("Change Name")
+                .setView(input)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String newName = input.getText().toString().trim().toUpperCase();
+
+                    if (!newName.isEmpty() && !newName.equals(oldName)) {
+                        Set<String> oldProfiles = prefs.getStringSet("ALL_PROFILES", new HashSet<>());
+
+                        if (oldProfiles.contains(newName)) {
+                            Toast.makeText(ProfilesActivity.this, "That profile already exists!", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        Set<String> newProfiles = new HashSet<>(oldProfiles);
+                        newProfiles.remove(oldName);
+                        newProfiles.add(newName);
+                        prefs.edit().putStringSet("ALL_PROFILES", newProfiles).apply();
+
+                        String avatarPath = prefs.getString("AVATAR_" + oldName, null);
+                        if (avatarPath != null) {
+                            prefs.edit().putString("AVATAR_" + newName, avatarPath).apply();
+                            prefs.edit().remove("AVATAR_" + oldName).apply();
+                        }
+
+                        if (oldName.equals(prefs.getString("ACTIVE_PROFILE", ""))) {
+                            prefs.edit().putString("ACTIVE_PROFILE", newName).apply();
+                        }
+
+                        recordPlayerLog(newName + "|" + oldName, "RENAMED");
+
+                        new Thread(() -> {
+                            AppDatabase.getInstance(this).wordDao().updatePlayerName(oldName, newName);
+                            AppDatabase.getInstance(this).quizRecordDao().updatePlayerName(oldName, newName);
+
+                            runOnUiThread(() -> {
+                                Toast.makeText(this, "Profile renamed to " + newName + "!", Toast.LENGTH_SHORT).show();
+                                loadProfiles();
+                            });
+                        }).start();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void recordPlayerLog(String playerName, String logType) {
         new Thread(() -> {
             long timestamp = System.currentTimeMillis();
-            // Storing these inside the LogEntry table using a special prefix so we can filter them later
-            LogEntry log = new LogEntry("PLAYER_LOG|" + playerName, action, timestamp);
+            LogEntry log = new LogEntry("PLAYER_LOG", logType + "|" + playerName, timestamp);
             AppDatabase.getInstance(this).logDao().insertLog(log);
         }).start();
     }
 
-    // ==========================================
-    // THE LIST ADAPTER
-    // ==========================================
     private class ProfileAdapter extends RecyclerView.Adapter<ProfileAdapter.ProfileViewHolder> {
         private final List<String> profiles;
 
@@ -208,6 +255,11 @@ public class ProfilesActivity extends AppCompatActivity {
                 finish();
             });
 
+            holder.btnEditProfile.setOnClickListener(v -> {
+                SoundManager.getInstance(ProfilesActivity.this).playClick();
+                showEditProfileDialog(profileName);
+            });
+
             holder.btnDeleteProfile.setOnClickListener(v -> {
                 SoundManager.getInstance(ProfilesActivity.this).playClick();
                 new AlertDialog.Builder(ProfilesActivity.this)
@@ -220,8 +272,7 @@ public class ProfilesActivity extends AppCompatActivity {
                             prefs.edit().putStringSet("ALL_PROFILES", newProfiles).apply();
                             prefs.edit().remove("AVATAR_" + profileName).apply();
 
-                            // 🌟 LOG: PROFILE DELETED
-                            recordPlayerLog(profileName, "Deleted profile");
+                            recordPlayerLog(profileName, "DELETED");
 
                             if (profileName.equals(prefs.getString("ACTIVE_PROFILE", ""))) {
                                 if (!newProfiles.isEmpty()) {
@@ -246,12 +297,13 @@ public class ProfilesActivity extends AppCompatActivity {
         class ProfileViewHolder extends RecyclerView.ViewHolder {
             TextView tvProfileName;
             ImageView ivAvatar;
-            ImageButton btnDeleteProfile;
+            ImageButton btnEditProfile, btnDeleteProfile;
 
             public ProfileViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvProfileName = itemView.findViewById(R.id.tvProfileName);
                 ivAvatar = itemView.findViewById(R.id.ivAvatar);
+                btnEditProfile = itemView.findViewById(R.id.btnEditProfile);
                 btnDeleteProfile = itemView.findViewById(R.id.btnDeleteProfile);
             }
         }
