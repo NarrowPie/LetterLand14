@@ -50,6 +50,9 @@ public class WriteActivity extends AppCompatActivity {
     private final Handler scanHandler = new Handler(Looper.getMainLooper());
     private Runnable scanRunnable;
 
+    // 🛡️ Leak Tracker for Dialog
+    private AlertDialog newWordDialog;
+
     private final ActivityResultLauncher<Void> takePictureLauncher = registerForActivityResult(
             new ActivityResultContracts.TakePicturePreview(),
             bitmap -> {
@@ -271,12 +274,12 @@ public class WriteActivity extends AppCompatActivity {
         if (isFinishing() || isDestroyed()) return;
 
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_new_word, null);
-        AlertDialog customDialog = new AlertDialog.Builder(this)
+        newWordDialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
                 .create();
 
-        if (customDialog.getWindow() != null) {
-            customDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        if (newWordDialog.getWindow() != null) {
+            newWordDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
 
         TextView tvDetected = dialogView.findViewById(R.id.tvDetectedWord);
@@ -286,17 +289,17 @@ public class WriteActivity extends AppCompatActivity {
             SoundManager.getInstance(this).playShutter();
             pendingWord = wordToSave;
             takePictureLauncher.launch(null);
-            customDialog.dismiss();
+            newWordDialog.dismiss();
         });
 
         dialogView.findViewById(R.id.btnDialogLater).setOnClickListener(v1 -> {
             SoundManager.getInstance(this).playClick();
-            customDialog.dismiss();
+            newWordDialog.dismiss();
             resetCanvasAndText();
         });
 
-        customDialog.setCancelable(false);
-        customDialog.show();
+        newWordDialog.setCancelable(false);
+        newWordDialog.show();
     }
 
     private void saveToAlmanac(String word, Bitmap bitmap) {
@@ -341,6 +344,11 @@ public class WriteActivity extends AppCompatActivity {
         if (textToSpeech != null) {
             textToSpeech.stop();
             textToSpeech.shutdown();
+        }
+
+        // 🛡️ Prevent window leak crash
+        if (newWordDialog != null && newWordDialog.isShowing()) {
+            newWordDialog.dismiss();
         }
 
         super.onDestroy();

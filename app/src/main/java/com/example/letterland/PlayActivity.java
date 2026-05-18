@@ -68,6 +68,9 @@ public class PlayActivity extends AppCompatActivity {
 
     private ExecutorService cameraExecutor;
 
+    // 🛡️ Leak Tracker for Dialog
+    private AlertDialog newWordDialog;
+
     private final ActivityResultLauncher<Void> takePictureLauncher = registerForActivityResult(
             new ActivityResultContracts.TakePicturePreview(),
             bitmap -> {
@@ -95,7 +98,10 @@ public class PlayActivity extends AppCompatActivity {
                 reader.close();
             } catch (Exception e) {
                 e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(this, "Failed to load dictionary file!", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    Toast.makeText(this, "Failed to load dictionary file!", Toast.LENGTH_SHORT).show();
+                });
             }
 
             try {
@@ -173,6 +179,8 @@ public class PlayActivity extends AppCompatActivity {
                 WordEntry savedWord = AppDatabase.getInstance(this).wordDao().findWordForProfile(wordToSearch, player);
 
                 runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+
                     if (savedWord != null) {
                         highlightBox.setVisibility(View.GONE);
                         android.content.Intent intent = new android.content.Intent(PlayActivity.this, WordDetailActivity.class);
@@ -183,12 +191,12 @@ public class PlayActivity extends AppCompatActivity {
                     } else {
                         View dialogView = LayoutInflater.from(PlayActivity.this).inflate(R.layout.dialog_new_word, null);
 
-                        AlertDialog customDialog = new AlertDialog.Builder(PlayActivity.this, R.style.CustomDialogTheme)
+                        newWordDialog = new AlertDialog.Builder(PlayActivity.this, R.style.CustomDialogTheme)
                                 .setView(dialogView)
                                 .create();
 
-                        if (customDialog.getWindow() != null) {
-                            customDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+                        if (newWordDialog.getWindow() != null) {
+                            newWordDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
                         }
 
                         TextView tvDetected = dialogView.findViewById(R.id.tvDetectedWord);
@@ -198,16 +206,16 @@ public class PlayActivity extends AppCompatActivity {
                             SoundManager.getInstance(PlayActivity.this).playShutter();
                             pendingWord = wordToSearch;
                             takePictureLauncher.launch(null);
-                            customDialog.dismiss();
+                            newWordDialog.dismiss();
                         });
 
                         dialogView.findViewById(R.id.btnDialogLater).setOnClickListener(v1 -> {
-                            customDialog.dismiss();
+                            newWordDialog.dismiss();
                             resumeRealTimeScanning();
                         });
 
-                        customDialog.setCancelable(false);
-                        customDialog.show();
+                        newWordDialog.setCancelable(false);
+                        newWordDialog.show();
                     }
                 });
             }).start();
@@ -233,12 +241,12 @@ public class PlayActivity extends AppCompatActivity {
                 startRealTimeScanning();
 
             } catch (Exception e) {
+                if (isFinishing() || isDestroyed()) return;
                 Toast.makeText(this, "Failed to start camera.", Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
-    // 🚀 NEW: Forces the image into a high-contrast, black-and-white "outline"
     private Bitmap enhanceImageForOCR(Bitmap original) {
         Bitmap enhanced = Bitmap.createBitmap(original.getWidth(), original.getHeight(), original.getConfig());
         Canvas canvas = new Canvas(enhanced);
@@ -266,7 +274,7 @@ public class PlayActivity extends AppCompatActivity {
     private final Runnable realTimeRunnable = new Runnable() {
         @Override
         public void run() {
-            if (isScanningPaused) return;
+            if (isScanningPaused || isFinishing() || isDestroyed()) return;
 
             final Bitmap fullBitmap = viewFinder.getBitmap();
             if (fullBitmap == null) {
@@ -294,9 +302,9 @@ public class PlayActivity extends AppCompatActivity {
             }
 
             cameraExecutor.execute(() -> {
-                // 🚀 Run the crop through our high-contrast filter before ML Kit sees it
-                Bitmap cleanedBitmap = enhanceImageForOCR(croppedBitmap);
+                if (isFinishing() || isDestroyed()) return;
 
+                Bitmap cleanedBitmap = enhanceImageForOCR(croppedBitmap);
                 InputImage image = InputImage.fromBitmap(cleanedBitmap, 0);
 
                 textRecognizer.process(image)
@@ -304,7 +312,6 @@ public class PlayActivity extends AppCompatActivity {
                             processVisionTextInBackground(visionText, width, height);
                         })
                         .addOnCompleteListener(task -> {
-                            // Safely recycle BOTH bitmaps to keep memory use incredibly low
                             croppedBitmap.recycle();
                             cleanedBitmap.recycle();
 
@@ -317,7 +324,7 @@ public class PlayActivity extends AppCompatActivity {
     };
 
     private void processVisionTextInBackground(Text visionText, int cropWidth, int cropHeight) {
-        if (isScanningPaused) return;
+        if (isScanningPaused || isFinishing() || isDestroyed()) return;
 
         String bestWord = "";
         Rect bestBox = null;
@@ -335,7 +342,6 @@ public class PlayActivity extends AppCompatActivity {
             for (Text.Line line : block.getLines()) {
                 for (Text.Element element : line.getElements()) {
                     String rawWord = element.getText().toUpperCase().replaceAll("[^A-Z]", "");
-
                     String smartWord = findClosestWord(rawWord);
 
                     if (!smartWord.isEmpty() && smartWord.length() <= 10) {
@@ -361,6 +367,8 @@ public class PlayActivity extends AppCompatActivity {
         final Rect finalBox = bestBox;
 
         runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
+
             if (!finalWord.isEmpty() && finalBox != null) {
                 currentlyHighlightedWord = finalWord;
                 highlightBox.setTranslationX(finalBox.left);
@@ -405,12 +413,13 @@ public class PlayActivity extends AppCompatActivity {
             WordEntry newEntry = new WordEntry(word, player, file.getAbsolutePath());
             AppDatabase.getInstance(this).wordDao().insert(newEntry);
 
-            // 🚀 INSTANT DICTIONARY UPDATE: Add the new word to the live scanner memory
             if (!DICTIONARY.contains(word)) {
                 DICTIONARY.add(word);
             }
 
             runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+
                 Toast.makeText(this, word + " saved to Almanac!", Toast.LENGTH_SHORT).show();
                 pendingWord = "";
 
@@ -422,7 +431,9 @@ public class PlayActivity extends AppCompatActivity {
             });
         } catch (java.io.IOException e) {
             e.printStackTrace();
-            runOnUiThread(this::resumeRealTimeScanning);
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) resumeRealTimeScanning();
+            });
         }
     }
 
@@ -476,6 +487,12 @@ public class PlayActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        // 🛡️ Prevent window leak crash
+        if (newWordDialog != null && newWordDialog.isShowing()) {
+            newWordDialog.dismiss();
+        }
+
         realTimeHandler.removeCallbacks(realTimeRunnable);
         if (cameraExecutor != null) {
             cameraExecutor.shutdown();

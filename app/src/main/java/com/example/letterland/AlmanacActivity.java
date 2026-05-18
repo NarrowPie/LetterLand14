@@ -82,7 +82,11 @@ public class AlmanacActivity extends AppCompatActivity {
                 myWords = AppDatabase.getInstance(this).wordDao().getAllWordsForProfile(player);
             }
 
-            runOnUiThread(() -> adapter.updateData(myWords));
+            runOnUiThread(() -> {
+                // 🛡️ Prevent crashes if user backs out immediately
+                if (isFinishing() || isDestroyed()) return;
+                adapter.updateData(myWords);
+            });
         }).start();
     }
 
